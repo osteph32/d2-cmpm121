@@ -1,6 +1,15 @@
 import "./style.css";
 
-type Tool = "pen" | "tree";
+const treeImage = new Image();
+treeImage.src = "src/Assets/tree.png";
+
+const houseImage = new Image();
+houseImage.src = "src/Assets/house.png";
+
+const castleImage = new Image();
+castleImage.src = "src/Assets/castle.png";
+
+type Tool = "pen" | "tree" | "house" | "castle";
 
 type DrawingCommand = {
   draw(context: CanvasRenderingContext2D): void;
@@ -17,6 +26,8 @@ let activeGesture: {
 
 const app = document.querySelector<HTMLElement>("#app")!;
 let selectedTool: Tool = "pen";
+
+let stampSize = 40;
 
 const heading = document.createElement("h1");
 heading.textContent = "Tiny World Map";
@@ -54,7 +65,21 @@ function createToolButton(tool: Tool, label: string) {
 toolbar.append(
   createToolButton("pen", "Pen"),
   createToolButton("tree", "Tree"),
+  createToolButton("house", "House"),
+  createToolButton("castle", "Castle"),
 );
+
+// add slider
+const sizeSlider = document.createElement("input");
+sizeSlider.type = "range";
+sizeSlider.min = "10";
+sizeSlider.max = "500";
+sizeSlider.value = "50";
+
+sizeSlider.addEventListener("input", () => {
+  stampSize = Number(sizeSlider.value);
+});
+toolbar.append("Stamp Size: ", sizeSlider);
 
 const canvas = document.createElement("canvas");
 canvas.width = 800;
@@ -70,15 +95,57 @@ function createTree(x: number, y: number) {
     kind: "stamp",
     x,
     y,
-    symbol: "[tree]", // Temporary for tree icon
-    size: 40,
+    size: stampSize,
     draw(target: CanvasRenderingContext2D) {
       target.save();
-      target.font = `${this.size}px sans-serif`;
-      target.textAlign = "center";
-      target.textBaseline = "middle";
-      target.fillStyle = "black";
-      target.fillText(this.symbol, this.x, this.y);
+      target.drawImage(
+        treeImage,
+        this.x - this.size / 2,
+        this.y - this.size / 2,
+        this.size,
+        this.size,
+      );
+      target.restore();
+    },
+  };
+}
+
+// House stamp
+function createHouse(x: number, y: number) {
+  return {
+    kind: "stamp",
+    x,
+    y,
+    size: stampSize,
+    draw(target: CanvasRenderingContext2D) {
+      target.save();
+      target.drawImage(
+        houseImage,
+        this.x - this.size / 2,
+        this.y - this.size / 2,
+        this.size,
+        this.size,
+      );
+      target.restore();
+    },
+  };
+}
+
+function createCastle(x: number, y: number) {
+  return {
+    kind: "stamp",
+    x,
+    y,
+    size: stampSize,
+    draw(target: CanvasRenderingContext2D) {
+      target.save();
+      target.drawImage(
+        castleImage,
+        this.x - this.size / 2,
+        this.y - this.size / 2,
+        this.size,
+        this.size,
+      );
       target.restore();
     },
   };
@@ -201,6 +268,28 @@ canvas.addEventListener("click", (event) => {
   const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
 
   drawing.push(createTree(x, y));
+  redraw();
+});
+
+canvas.addEventListener("click", (event) => {
+  if (selectedTool !== "house") return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
+
+  drawing.push(createHouse(x, y));
+  redraw();
+});
+
+canvas.addEventListener("click", (event) => {
+  if (selectedTool !== "castle") return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
+
+  drawing.push(createCastle(x, y));
   redraw();
 });
 
