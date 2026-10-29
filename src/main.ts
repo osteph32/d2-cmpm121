@@ -2,6 +2,19 @@ import "./style.css";
 
 type Tool = "pen" | "tree";
 
+type DrawingCommand = {
+  draw(context: CanvasRenderingContext2D): void;
+};
+
+const drawing: DrawingCommand[] = [];
+
+type Point = { x: number; y: number };
+
+let activeGesture: {
+  pointerId: number;
+  stroke: ReturnType<typeof createStroke>;
+} | null = null;
+
 const app = document.querySelector<HTMLElement>("#app")!;
 let selectedTool: Tool = "pen";
 
@@ -48,6 +61,154 @@ canvas.width = 800;
 canvas.height = 500;
 canvas.setAttribute("aria-label", "World map drawing canvas");
 canvas.textContent = "Your browser does not support canvas.";
+
+const context = canvas.getContext("2d")!;
+
+// Tree stamp
+function createTree(x: number, y: number) {
+  return {
+    kind: "stamp",
+    x,
+    y,
+    symbol: "[tree]", // Temporary for tree icon
+    size: 40,
+    draw(target: CanvasRenderingContext2D) {
+      target.save();
+      target.font = `${this.size}px sans-serif`;
+      target.textAlign = "center";
+      target.textBaseline = "middle";
+      target.fillStyle = "black";
+      target.fillText(this.symbol, this.x, this.y);
+      target.restore();
+    },
+  };
+}
+
+function createStroke(start: Point) {
+  return {
+    kind: "stroke",
+    points: [start],
+    color: "black",
+    width: 3,
+    draw(target: CanvasRenderingContext2D) {
+      const first = this.points[0]!;
+      target.save();
+      target.strokeStyle = this.color;
+      target.fillStyle = this.color;
+      target.lineWidth = this.width;
+      target.lineCap = "round";
+      target.lineJoin = "round";
+      target.beginPath();
+
+      if (this.points.length === 1) {
+        target.arc(first.x, first.y, this.width / 2, 0, Math.PI * 2);
+        target.fill();
+      } else {
+        target.moveTo(first.x, first.y);
+        for (const point of this.points.slice(1)) {
+          target.lineTo(point.x, point.y);
+        }
+        target.stroke();
+      }
+
+      target.restore();
+    },
+  };
+}
+
+function extendStroke(event: PointerEvent) {
+  if (!activeGesture) return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const point = {
+    x: (event.clientX - bounds.left) * (canvas.width / bounds.width),
+    y: (event.clientY - bounds.top) * (canvas.height / bounds.height),
+  };
+  const points = activeGesture.stroke.points;
+  const last = points[points.length - 1]!;
+
+  if (point.x !== last.x || point.y !== last.y) {
+    points.push(point);
+  }
+}
+
+function cancelStroke() {
+  if (!activeGesture) return;
+  activeGesture = null;
+  redraw();
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (
+    selectedTool !== "pen" || event.button !== 0 ||
+    !event.isPrimary || activeGesture
+  ) return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const start = {
+    x: (event.clientX - bounds.left) * (canvas.width / bounds.width),
+    y: (event.clientY - bounds.top) * (canvas.height / bounds.height),
+  };
+  activeGesture = {
+    pointerId: event.pointerId,
+    stroke: createStroke(start),
+  };
+  redraw();
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (activeGesture?.pointerId !== event.pointerId) return;
+  if ((event.buttons & 1) === 0) {
+    cancelStroke();
+    return;
+  }
+  extendStroke(event);
+  redraw();
+});
+
+canvas.addEventListener("pointerup", (event) => {
+  if (!activeGesture || activeGesture.pointerId !== event.pointerId) return;
+  extendStroke(event);
+  drawing.push(activeGesture.stroke);
+  activeGesture = null;
+  redraw();
+});
+
+canvas.addEventListener("pointerleave", (event) => {
+  if (activeGesture?.pointerId === event.pointerId) cancelStroke();
+});
+
+canvas.addEventListener("pointercancel", (event) => {
+  if (activeGesture?.pointerId === event.pointerId) cancelStroke();
+});
+
+globalThis.addEventListener("blur", cancelStroke);
+
+function redraw() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  for (const command of drawing) {
+    command.draw(context);
+  }
+
+  activeGesture?.stroke.draw(context);
+}
+
+canvas.addEventListener("click", (event) => {
+  if (selectedTool !== "tree") return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
+
+  drawing.push(createTree(x, y));
+  redraw();
+});
+
+const redrawButton = document.createElement("button");
+redrawButton.type = "button";
+redrawButton.textContent = "Redraw";
+redrawButton.addEventListener("click", redraw);
+toolbar.append(redrawButton);
 
 const canvasFrame = document.createElement("div");
 canvasFrame.className = "canvas-frame";
