@@ -9,7 +9,10 @@ houseImage.src = "src/Assets/house.png";
 const castleImage = new Image();
 castleImage.src = "src/Assets/castle.png";
 
-type Tool = "pen" | "tree" | "house" | "castle";
+const mountainImage = new Image();
+mountainImage.src = new URL("./Assets/mountain.png", import.meta.url).href;
+
+type Tool = "pen" | "tree" | "house" | "castle" | "mountain";
 
 type DrawingCommand = {
   draw(context: CanvasRenderingContext2D): void;
@@ -27,7 +30,9 @@ let activeGesture: {
 const app = document.querySelector<HTMLElement>("#app")!;
 let selectedTool: Tool = "pen";
 
-let stampSize = 40;
+let stampSize = 50;
+let penColor = "#000000";
+let penWidth = 3;
 
 const heading = document.createElement("h1");
 heading.textContent = "Tiny World Map";
@@ -67,7 +72,69 @@ toolbar.append(
   createToolButton("tree", "Tree"),
   createToolButton("house", "House"),
   createToolButton("castle", "Castle"),
+  createToolButton("mountain", "Mountain"),
 );
+
+// Pen Controls
+const penControls = document.createElement("div");
+penControls.className = "pen-controls";
+
+const colorInput = document.createElement("input");
+colorInput.type = "color";
+colorInput.value = penColor;
+
+colorInput.addEventListener("input", () => {
+  penColor = colorInput.value;
+});
+
+const colorLabel = document.createElement("label");
+colorLabel.textContent = "Pen color: ";
+colorLabel.append(colorInput);
+
+const penWidthSlider = document.createElement("input");
+penWidthSlider.type = "range";
+penWidthSlider.min = "1";
+penWidthSlider.max = "20";
+penWidthSlider.step = "1";
+
+const penWidthDisplay = document.createElement("span");
+
+function setPenWidth(width: number) {
+  penWidth = width;
+  penWidthSlider.value = String(width);
+  penWidthDisplay.textContent = `${width} px`;
+}
+
+penWidthSlider.addEventListener("input", () => {
+  setPenWidth(Number(penWidthSlider.value));
+});
+
+const widthLabel = document.createElement("label");
+widthLabel.textContent = "Pen thickness: ";
+widthLabel.append(penWidthSlider, penWidthDisplay);
+
+penControls.append(colorLabel, widthLabel);
+
+const penPresets = [
+  { label: "Thin", width: 3 },
+  { label: "Thick", width: 10 },
+];
+
+for (const preset of penPresets) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = preset.label;
+
+  button.addEventListener("click", () => {
+    setPenWidth(preset.width);
+    selectedTool = "pen";
+    updateSelection();
+  });
+
+  penControls.append(button);
+}
+
+setPenWidth(penWidth);
 
 // add slider
 const sizeSlider = document.createElement("input");
@@ -151,12 +218,32 @@ function createCastle(x: number, y: number) {
   };
 }
 
+function createMountain(x: number, y: number) {
+  return {
+    kind: "stamp",
+    x,
+    y,
+    size: stampSize,
+    draw(target: CanvasRenderingContext2D) {
+      target.save();
+      target.drawImage(
+        mountainImage,
+        this.x - this.size / 2,
+        this.y - this.size / 2,
+        this.size,
+        this.size,
+      );
+      target.restore();
+    },
+  };
+}
+
 function createStroke(start: Point) {
   return {
     kind: "stroke",
     points: [start],
-    color: "black",
-    width: 3,
+    color: penColor,
+    width: penWidth,
     draw(target: CanvasRenderingContext2D) {
       const first = this.points[0]!;
       target.save();
@@ -293,6 +380,18 @@ canvas.addEventListener("click", (event) => {
   redraw();
 });
 
+canvas.addEventListener("click", (event) => {
+  if (selectedTool !== "mountain") return;
+  if (!mountainImage.complete || mountainImage.naturalWidth === 0) return;
+
+  const bounds = canvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
+
+  drawing.push(createMountain(x, y));
+  redraw();
+});
+
 const redrawButton = document.createElement("button");
 redrawButton.type = "button";
 redrawButton.textContent = "Redraw";
@@ -303,5 +402,5 @@ const canvasFrame = document.createElement("div");
 canvasFrame.className = "canvas-frame";
 canvasFrame.append(canvas);
 
-app.append(heading, message, toolbar, canvasFrame);
+app.append(heading, message, toolbar, penControls, canvasFrame);
 updateSelection();
