@@ -71,7 +71,7 @@ function selectTool(tool: Tool) {
   if (preset) {
     penColor = preset.color;
     colorInput.value = preset.color;
-    setPenWidth(preset.width);
+    setSize(preset.width * 10);
   }
 
   updateSelection();
@@ -115,31 +115,6 @@ const colorLabel = document.createElement("label");
 colorLabel.textContent = "Pen color: ";
 colorLabel.append(colorInput);
 
-const penWidthSlider = document.createElement("input");
-penWidthSlider.type = "range";
-penWidthSlider.min = "1";
-penWidthSlider.max = "20";
-penWidthSlider.step = "1";
-
-const penWidthDisplay = document.createElement("span");
-
-function setPenWidth(width: number) {
-  penWidth = width;
-  penWidthSlider.value = String(width);
-  penWidthDisplay.textContent = `${width} px`;
-}
-
-penWidthSlider.addEventListener("input", () => {
-  setPenWidth(Number(penWidthSlider.value));
-  selectTool("pen");
-});
-
-const widthLabel = document.createElement("label");
-widthLabel.textContent = "Pen thickness: ";
-widthLabel.append(penWidthSlider, penWidthDisplay);
-
-penControls.append(colorLabel, widthLabel);
-
 const penPresets = [
   { label: "Thin", width: 3 },
   { label: "Thick", width: 10 },
@@ -151,15 +126,13 @@ for (const preset of penPresets) {
   button.textContent = preset.label;
 
   button.addEventListener("click", () => {
-    setPenWidth(preset.width);
+    setSize(preset.width * 10);
     selectedTool = "pen";
     updateSelection();
   });
 
   penControls.append(button);
 }
-
-setPenWidth(penWidth);
 
 // Custom pen tool
 let nextPenId = 1;
@@ -214,17 +187,35 @@ savePenButton.addEventListener("click", () => {
 
 penControls.append(presetNameInput, savePenButton);
 
-// add slider
+// add slider for stamp size and pen size
 const sizeSlider = document.createElement("input");
 sizeSlider.type = "range";
 sizeSlider.min = "10";
 sizeSlider.max = "500";
 sizeSlider.value = "50";
 
+const sizeDisplay = document.createElement("span");
+
+function setSize(size: number) {
+  stampSize = size;
+  penWidth = Math.min(20, Math.max(1, Math.round(size / 10)));
+  sizeSlider.value = String(size);
+
+  sizeDisplay.textContent = `${size} px`;
+}
+
 sizeSlider.addEventListener("input", () => {
-  stampSize = Number(sizeSlider.value);
+  setSize(Number(sizeSlider.value));
+  selectTool("pen");
 });
-toolbar.append("Stamp Size: ", sizeSlider);
+
+const sizeLabel = document.createElement("label");
+sizeLabel.textContent = "Size: ";
+
+sizeLabel.append(sizeSlider, sizeDisplay);
+penControls.append(colorLabel, sizeLabel);
+
+setSize(50);
 
 const canvas = document.createElement("canvas");
 canvas.width = 800;
@@ -612,4 +603,31 @@ app.append(
   historyControls,
   canvasFrame,
 );
+
+const controlPanel = document.createElement("div");
+controlPanel.className = "control-panel";
+
+const tools = document.createElement("div");
+tools.className = "control-section";
+tools.append(toolbar);
+
+const settings = document.createElement("div");
+settings.className = "control-section";
+settings.append(penControls, historyControls);
+
+const helpButtons = document.createElement("div");
+helpButtons.className = "control-section";
+helpButtons.append(historyControls);
+
+controlPanel.append(
+  tools,
+  canvasFrame,
+  settings,
+);
+app.append(
+  heading,
+  message,
+  controlPanel,
+);
+
 updateSelection();

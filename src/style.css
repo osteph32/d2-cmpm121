@@ -7,8 +7,13 @@ body {
 }
 
 #app {
-  max-width: 900px;
+  max-width: 1250px;
   margin: 0 auto;
+}
+canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 h1 {
@@ -59,17 +64,15 @@ canvas {
 }
 
 .pen-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  align-items: stretch;
+}
+
+.pen-controls button {
+  width: 100%;
 }
 
 .pen-controls label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: space-between;
 }
 
 .history-controls {
@@ -81,4 +84,45 @@ canvas {
 button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+#app {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.control-panel {
+  display: grid;
+  grid-template-columns: 160px 800px 220px;
+  gap: 16px;
+  align-items: start;
+  justify-content: center;
+}
+.control-panel {
+  margin-top: 80px;
+}
+
+.control-section {
+  padding: 12px;
+  background: #fff5df;
+  border: 2px solid #777;
+}
+
+.toolbar,
+.pen-controls,
+.history-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.canvas-frame {
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .control-panel {
+    grid-template-columns: 1fr;
+  }
 }
