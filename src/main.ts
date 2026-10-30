@@ -12,13 +12,23 @@ castleImage.src = "src/Assets/castle.png";
 const mountainImage = new Image();
 mountainImage.src = new URL("./Assets/mountain.png", import.meta.url).href;
 
-type Tool = "pen" | "tree" | "house" | "castle" | "mountain";
+type Tool = "pen" | "tree" | "house" | "castle" | "mountain" | `pen-${number}`;
+
+type PenPreset = {
+  label: string;
+  color: string;
+  width: number;
+};
+const penTools = new Map<Tool, PenPreset>();
 
 type DrawingCommand = {
   draw(context: CanvasRenderingContext2D): void;
 };
 
-const drawing: DrawingCommand[] = [];
+let drawing: DrawingCommand[] = [];
+
+const drawingHistory: DrawingCommand[][] = [drawing];
+let historyIndex = 0;
 
 type Point = { x: number; y: number };
 
@@ -53,14 +63,27 @@ function updateSelection() {
   }
 }
 
+function selectTool(tool: Tool) {
+  cancelStroke();
+  selectedTool = tool;
+
+  const preset = penTools.get(tool);
+  if (preset) {
+    penColor = preset.color;
+    colorInput.value = preset.color;
+    setPenWidth(preset.width);
+  }
+
+  updateSelection();
+}
+
 function createToolButton(tool: Tool, label: string) {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = label;
 
   button.addEventListener("click", () => {
-    selectedTool = tool;
-    updateSelection();
+    selectTool(tool);
   });
 
   toolButtons.set(tool, button);
@@ -85,6 +108,7 @@ colorInput.value = penColor;
 
 colorInput.addEventListener("input", () => {
   penColor = colorInput.value;
+  selectTool("pen");
 });
 
 const colorLabel = document.createElement("label");
@@ -107,6 +131,7 @@ function setPenWidth(width: number) {
 
 penWidthSlider.addEventListener("input", () => {
   setPenWidth(Number(penWidthSlider.value));
+  selectTool("pen");
 });
 
 const widthLabel = document.createElement("label");
@@ -135,6 +160,59 @@ for (const preset of penPresets) {
 }
 
 setPenWidth(penWidth);
+
+// Custom pen tool
+let nextPenId = 1;
+
+function addPenPreset(preset: PenPreset): Tool {
+  const tool: Tool = `pen-${nextPenId++}`;
+  penTools.set(tool, { ...preset });
+  penControls.append(createToolButton(tool, preset.label));
+
+  return tool;
+}
+
+const mapPenPresets: PenPreset[] = [
+  { label: "River", color: "#2f80c4", width: 10 },
+  { label: "Trail", color: "#8b5a2b", width: 3 },
+  { label: "Deep Forest Path", color: "#2f4f35", width: 5 },
+  { label: "Border", color: "#000000", width: 6 },
+];
+
+for (const preset of mapPenPresets) {
+  addPenPreset(preset);
+}
+
+const presetNameInput = document.createElement("input");
+presetNameInput.type = "text";
+presetNameInput.placeholder = "Preset name";
+presetNameInput.setAttribute("aria-label", "Pen preset name");
+
+const savePenButton = document.createElement("button");
+savePenButton.type = "button";
+savePenButton.textContent = "Save Pen Preset";
+savePenButton.disabled = true;
+
+presetNameInput.addEventListener("input", () => {
+  savePenButton.disabled = presetNameInput.value.trim() === "";
+});
+
+savePenButton.addEventListener("click", () => {
+  const label = presetNameInput.value.trim();
+  if (!label) return;
+
+  const tool = addPenPreset({
+    label,
+    color: penColor,
+    width: penWidth,
+  });
+
+  selectTool(tool);
+  presetNameInput.value = "";
+  savePenButton.disabled = true;
+});
+
+penControls.append(presetNameInput, savePenButton);
 
 // add slider
 const sizeSlider = document.createElement("input");
@@ -294,7 +372,8 @@ function cancelStroke() {
 
 canvas.addEventListener("pointerdown", (event) => {
   if (
-    selectedTool !== "pen" || event.button !== 0 ||
+    (selectedTool !== "pen" && !penTools.has(selectedTool)) ||
+    event.button !== 0 ||
     !event.isPrimary || activeGesture
   ) return;
 
@@ -323,9 +402,9 @@ canvas.addEventListener("pointermove", (event) => {
 canvas.addEventListener("pointerup", (event) => {
   if (!activeGesture || activeGesture.pointerId !== event.pointerId) return;
   extendStroke(event);
-  drawing.push(activeGesture.stroke);
+  const finishedStroke = activeGesture.stroke;
   activeGesture = null;
-  redraw();
+  commitDrawing([...drawing, finishedStroke]);
 });
 
 canvas.addEventListener("pointerleave", (event) => {
@@ -354,8 +433,7 @@ canvas.addEventListener("click", (event) => {
   const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
   const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
 
-  drawing.push(createTree(x, y));
-  redraw();
+  commitDrawing([...drawing, createTree(x, y)]);
 });
 
 canvas.addEventListener("click", (event) => {
@@ -365,8 +443,7 @@ canvas.addEventListener("click", (event) => {
   const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
   const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
 
-  drawing.push(createHouse(x, y));
-  redraw();
+  commitDrawing([...drawing, createHouse(x, y)]);
 });
 
 canvas.addEventListener("click", (event) => {
@@ -376,8 +453,7 @@ canvas.addEventListener("click", (event) => {
   const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
   const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
 
-  drawing.push(createCastle(x, y));
-  redraw();
+  commitDrawing([...drawing, createCastle(x, y)]);
 });
 
 canvas.addEventListener("click", (event) => {
@@ -388,8 +464,7 @@ canvas.addEventListener("click", (event) => {
   const x = (event.clientX - bounds.left) * (canvas.width / bounds.width);
   const y = (event.clientY - bounds.top) * (canvas.height / bounds.height);
 
-  drawing.push(createMountain(x, y));
-  redraw();
+  commitDrawing([...drawing, createMountain(x, y)]);
 });
 
 const redrawButton = document.createElement("button");
@@ -398,9 +473,143 @@ redrawButton.textContent = "Redraw";
 redrawButton.addEventListener("click", redraw);
 toolbar.append(redrawButton);
 
+const historyControls = document.createElement("div");
+historyControls.className = "history-controls";
+
+const undoButton = document.createElement("button");
+undoButton.type = "button";
+undoButton.textContent = "Undo";
+
+const redoButton = document.createElement("button");
+redoButton.type = "button";
+redoButton.textContent = "Redo";
+
+const clearButton = document.createElement("button");
+clearButton.type = "button";
+clearButton.textContent = "Clear";
+
+clearButton.addEventListener("click", () => {
+  cancelStroke();
+  if (drawing.length === 0) return;
+  commitDrawing([]);
+});
+
+function updateHistoryButtons() {
+  undoButton.disabled = historyIndex === 0;
+  redoButton.disabled = historyIndex === drawingHistory.length - 1;
+  clearButton.disabled = drawing.length === 0;
+}
+
+// Save a new map state and discard any abandoned redo history.
+function commitDrawing(nextDrawing: DrawingCommand[]) {
+  drawing = [...nextDrawing];
+  drawingHistory.splice(historyIndex + 1);
+  drawingHistory.push(drawing);
+  historyIndex = drawingHistory.length - 1;
+
+  updateHistoryButtons();
+  redraw();
+}
+
+undoButton.addEventListener("click", () => {
+  if (historyIndex === 0) return;
+
+  activeGesture = null;
+  historyIndex -= 1;
+  drawing = drawingHistory[historyIndex]!;
+
+  updateHistoryButtons();
+  redraw();
+});
+
+redoButton.addEventListener("click", () => {
+  if (historyIndex === drawingHistory.length - 1) return;
+
+  activeGesture = null;
+  historyIndex += 1;
+  drawing = drawingHistory[historyIndex]!;
+
+  updateHistoryButtons();
+  redraw();
+});
+
+// PNG export
+const exportButton = document.createElement("button");
+exportButton.type = "button";
+exportButton.textContent = "Download PNG";
+
+const exportStatus = document.createElement("span");
+exportStatus.setAttribute("role", "status");
+
+exportButton.addEventListener("click", () => {
+  exportStatus.textContent = "";
+
+  try {
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = canvas.width * 2;
+    exportCanvas.height = canvas.height * 2;
+
+    const exportContext = exportCanvas.getContext("2d");
+    if (!exportContext) {
+      throw new Error("Could not create the export context.");
+    }
+
+    exportContext.fillStyle = "#fffdf5";
+    exportContext.fillRect(
+      0,
+      0,
+      exportCanvas.width,
+      exportCanvas.height,
+    );
+    exportContext.scale(2, 2);
+
+    for (const command of drawing) {
+      command.draw(exportContext);
+    }
+
+    exportCanvas.toBlob((blob) => {
+      if (!blob) {
+        exportStatus.textContent = "Could not create the PNG. Try again.";
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "tiny-world-map.png";
+      link.hidden = true;
+      document.body.append(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      exportStatus.textContent = "PNG download requested.";
+    }, "image/png");
+  } catch (error) {
+    exportStatus.textContent = "Could not export the map. Try again.";
+    console.error("PNG export failed:", error);
+  }
+});
+
+historyControls.append(
+  undoButton,
+  redoButton,
+  clearButton,
+  exportButton,
+  exportStatus,
+);
+updateHistoryButtons();
+
 const canvasFrame = document.createElement("div");
 canvasFrame.className = "canvas-frame";
 canvasFrame.append(canvas);
 
-app.append(heading, message, toolbar, penControls, canvasFrame);
+app.append(
+  heading,
+  message,
+  toolbar,
+  penControls,
+  historyControls,
+  canvasFrame,
+);
 updateSelection();

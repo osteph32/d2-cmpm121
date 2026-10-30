@@ -71,3 +71,14 @@ canvas {
   align-items: center;
   gap: 8px;
 }
+
+.history-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
