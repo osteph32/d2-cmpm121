@@ -595,29 +595,16 @@ const canvasFrame = document.createElement("div");
 canvasFrame.className = "canvas-frame";
 canvasFrame.append(canvas);
 
-app.append(
-  heading,
-  message,
-  toolbar,
-  penControls,
-  historyControls,
-  canvasFrame,
-);
-
 const controlPanel = document.createElement("div");
 controlPanel.className = "control-panel";
 
 const tools = document.createElement("div");
 tools.className = "control-section";
-tools.append(toolbar);
+tools.append(toolbar, historyControls);
 
 const settings = document.createElement("div");
 settings.className = "control-section";
-settings.append(penControls, historyControls);
-
-const helpButtons = document.createElement("div");
-helpButtons.className = "control-section";
-helpButtons.append(historyControls);
+settings.append(penControls);
 
 controlPanel.append(
   tools,
